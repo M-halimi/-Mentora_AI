@@ -66,8 +66,24 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
       })
       const json = await res.json()
       if (!json.success) throw new Error()
-      const url = `${window.location.origin}/quiz/${json.data.quizId}`
-      await navigator.clipboard.writeText(url)
+      const baseUrl = window.location.origin
+      const url = `${baseUrl}/quiz/${json.data.quizId}`
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: 'Teacher Copilot Quiz', url })
+        } else {
+          await navigator.clipboard.writeText(url)
+        }
+      } catch {
+        const textarea = document.createElement('textarea')
+        textarea.value = url
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
       setShareState('copied')
       setTimeout(() => setShareState('idle'), 2500)
     } catch {
@@ -149,7 +165,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
           onClick={() => downloadJSON(questions)}
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.97]"
         >
-          <svg className="size-4 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg className="size-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
           JSON
@@ -158,7 +174,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
           onClick={() => downloadPDF(questions)}
           className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.97]"
         >
-          <svg className="size-4 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg className="size-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
           PDF
@@ -175,17 +191,17 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
           }`}
         >
           {shareState === 'loading' ? (
-            <div className="size-4 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+            <div className="size-4 shrink-0 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
           ) : shareState === 'copied' ? (
-            <svg className="size-4 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="size-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
             </svg>
           ) : shareState === 'error' ? (
-            <svg className="size-4 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="size-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
             </svg>
           ) : (
-            <svg className="size-4 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="size-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
             </svg>
           )}
@@ -317,7 +333,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
 
               {/* Explanation Panel */}
               {exp && (
-                <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 animate-scale-in">
+                <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 sm:p-5 animate-scale-in">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-1.5">
@@ -331,23 +347,25 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
                   </div>
 
                   {/* Language Tabs */}
-                  <div className="mb-3 flex gap-1">
-                    {(['base', 'en', 'fr', 'de', 'ar'] as const).map((lang) => {
-                      const current = explainLang[i] || 'base'
-                      return (
-                        <button
-                          key={lang}
-                          onClick={() => setExplainLang((prev) => ({ ...prev, [i]: lang }))}
-                          className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
-                            current === lang
-                              ? 'bg-indigo-100 text-indigo-700 shadow-sm'
-                              : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
-                          }`}
-                        >
-                          {lang === 'base' ? 'Base' : lang.toUpperCase()}
-                        </button>
-                      )
-                    })}
+                  <div className="mb-3 -mx-1 overflow-x-auto px-1 scrollbar-none">
+                    <div className="flex min-w-max gap-1">
+                      {(['base', 'en', 'fr', 'de', 'ar'] as const).map((lang) => {
+                        const current = explainLang[i] || 'base'
+                        return (
+                          <button
+                            key={lang}
+                            onClick={() => setExplainLang((prev) => ({ ...prev, [i]: lang }))}
+                            className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-all active:scale-[0.97] ${
+                              current === lang
+                                ? 'bg-indigo-100 text-indigo-700 shadow-sm'
+                                : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'
+                            }`}
+                          >
+                            {lang === 'base' ? 'Base' : lang.toUpperCase()}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   {(() => {

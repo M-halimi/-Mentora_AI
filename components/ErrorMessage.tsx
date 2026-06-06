@@ -16,7 +16,8 @@ export function ErrorMessage({ message, onDismiss }: { message: string; onDismis
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="flex size-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors active:scale-[0.95]"
+            aria-label="Dismiss"
           >
             <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

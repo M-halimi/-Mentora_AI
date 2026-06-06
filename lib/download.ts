@@ -2,13 +2,26 @@ import { QuizQuestion } from '@/types'
 import { jsPDF } from 'jspdf'
 
 export function downloadJSON(questions: QuizQuestion[], filename = 'quiz.json') {
-  const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  const content = JSON.stringify(questions, null, 2)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+  if (isIOS) {
+    const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(content)}`
+    const a = document.createElement('a')
+    a.href = dataUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } else {
+    const blob = new Blob([content], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 }
 
 export function downloadPDF(questions: QuizQuestion[], title = 'Quiz') {

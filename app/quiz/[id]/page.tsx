@@ -47,7 +47,7 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
         <p className="text-sm text-zinc-500">{error || 'This quiz may have expired.'}</p>
         <Link
           href="/"
-          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors active:scale-[0.97]"
         >
           Create your own quiz
         </Link>
@@ -68,19 +68,19 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
                 Shared Quiz
               </div>
               <p className="text-sm text-zinc-500">{questions.length} multiple-choice questions</p>
-            </div>
-            <Link
-              href="/"
-              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-all"
-            >
-              Create your own
-            </Link>
+        </div>
+        <Link
+          href="/"
+          className="shrink-0 rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-all active:scale-[0.97]"
+        >
+          Create your own
+        </Link>
           </div>
         </div>
 
         <div className="space-y-4">
           {questions.map((q, i) => (
-            <div key={i} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div key={i} className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm">
               <span className="inline-flex items-center justify-center rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 mb-4">
                 Question {i + 1}
               </span>
@@ -122,9 +122,9 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
         <div className="mt-8 text-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-md shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-[0.97]"
           >
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
             </svg>
             Create your own quiz
