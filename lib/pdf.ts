@@ -10,22 +10,24 @@ declare global {
     | undefined
 }
 
-let workerHandlerPromise: Promise<void> | null = null
+let workerPromise: Promise<void> | null = null
 
-async function ensureWorkerHandler() {
-  if (globalThis.pdfjsWorker) return
-  if (!workerHandlerPromise) {
-    workerHandlerPromise = (async () => {
-      const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
-      globalThis.pdfjsWorker = { WorkerMessageHandler }
-    })()
-  }
-  await workerHandlerPromise
+async function initWorker() {
+  const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  globalThis.pdfjsWorker = { WorkerMessageHandler }
 }
+
+async function ensureWorker() {
+  if (globalThis.pdfjsWorker) return
+  if (!workerPromise) workerPromise = initWorker()
+  await workerPromise
+}
+
+const EXTRACTION_TIMEOUT = 25_000
 
 export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
   const start = Date.now()
-  await ensureWorkerHandler()
+  await ensureWorker()
 
   const data = new Uint8Array(buffer)
 
@@ -39,6 +41,10 @@ export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
 
   console.log('[PDF] Document loaded, pages:', doc.numPages, `(${Date.now() - start}ms)`)
 
+  if (Date.now() - start > EXTRACTION_TIMEOUT) {
+    throw new Error(`PDF extraction timed out after ${EXTRACTION_TIMEOUT / 1000}s`)
+  }
+
   const pages: string[] = []
   for (let i = 1; i <= doc.numPages; i++) {
     const pageStart = Date.now()
@@ -47,6 +53,10 @@ export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
     const text = content.items.map((item: unknown) => (item as { str: string }).str).join(' ')
     pages.push(text)
     console.log('[PDF] Page', i, 'extracted', text.length, 'chars', `(${Date.now() - pageStart}ms)`)
+
+    if (Date.now() - start > EXTRACTION_TIMEOUT) {
+      throw new Error(`PDF extraction timed out after ${EXTRACTION_TIMEOUT / 1000}s`)
+    }
   }
 
   const result = pages.join('\n').trim()
