@@ -19,12 +19,37 @@ export default function Home() {
     setText(extracted)
     setStep('generating')
 
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      controller.abort()
+      console.error('[QuizGen] Request timed out')
+    }, 30_000)
+
     try {
+      console.log('[QuizGen] Starting generation, text length:', extracted.length)
+
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: extracted }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeout)
+
+      console.log('[QuizGen] Response status:', res.status)
+
+      if (!res.ok) {
+        let serverMsg = `Server error (${res.status})`
+        try {
+          const errBody = await res.json()
+          serverMsg = errBody?.error?.message || errBody?.error || serverMsg
+        } catch { }
+        setError(serverMsg)
+        setStep('error')
+        return
+      }
+
       const json = await res.json()
 
       if (!json.success) {
@@ -33,9 +58,20 @@ export default function Home() {
         return
       }
 
+      console.log('[QuizGen] Success, questions:', json.data?.questions?.length ?? 0)
       setQuestions(json.data.questions)
       setStep('complete')
-    } catch {
+    } catch (err: unknown) {
+      clearTimeout(timeout)
+
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        console.error('[QuizGen] Request timed out')
+        setError('Quiz generation timed out. Please try again.')
+        setStep('error')
+        return
+      }
+
+      console.error('[QuizGen] Unexpected error:', err)
       setError('Network error during quiz generation.')
       setStep('error')
     }

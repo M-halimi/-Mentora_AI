@@ -1,9 +1,12 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { LoadingSpinner } from './LoadingSpinner'
 import { ErrorMessage } from './ErrorMessage'
+
+const UPLOAD_TIMEOUT_MS = 25_000
+const MAX_FILE_SIZE = 9 * 1024 * 1024
 
 interface UploadFormProps {
   onTextExtracted: (text: string) => void
@@ -13,6 +16,7 @@ export function UploadForm({ onTextExtracted }: UploadFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [file, setFile] = useState<{ name: string; size: string } | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const onDrop = useCallback(async (accepted: File[]) => {
     const f = accepted[0]
@@ -22,11 +26,42 @@ export function UploadForm({ onTextExtracted }: UploadFormProps) {
     setFile({ name: f.name, size: formatSize(f.size) })
     setLoading(true)
 
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    const timeout = setTimeout(() => {
+      controller.abort()
+      console.error('[Upload] Request timed out after', UPLOAD_TIMEOUT_MS, 'ms')
+    }, UPLOAD_TIMEOUT_MS)
+
     try {
       const formData = new FormData()
       formData.set('file', f)
 
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      console.log('[Upload] Starting upload:', f.name, formatSize(f.size))
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeout)
+
+      console.log('[Upload] Response status:', res.status)
+
+      if (!res.ok) {
+        let serverMsg = `Server error (${res.status})`
+        try {
+          const errBody = await res.json()
+          serverMsg = errBody?.error?.message || errBody?.error || serverMsg
+        } catch { }
+        setError(serverMsg)
+        setLoading(false)
+        return
+      }
+
       const json = await res.json()
 
       if (!json.success) {
@@ -35,9 +70,27 @@ export function UploadForm({ onTextExtracted }: UploadFormProps) {
         return
       }
 
+      console.log('[Upload] Success, text length:', json.data?.text?.length ?? 0)
       onTextExtracted(json.data.text)
-    } catch {
-      setError('Network error. Please try again.')
+    } catch (err: unknown) {
+      clearTimeout(timeout)
+
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        console.error('[Upload] Request was aborted (timeout)')
+        setError('Upload timed out. Try a smaller PDF or a faster network.')
+        setLoading(false)
+        return
+      }
+
+      if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        console.error('[Upload] Network error - possibly offline or CORS')
+        setError('Network error. Check your connection and try again.')
+        setLoading(false)
+        return
+      }
+
+      console.error('[Upload] Unexpected error:', err)
+      setError('Upload failed. Please try again.')
       setLoading(false)
     }
   }, [onTextExtracted])
@@ -46,7 +99,7 @@ export function UploadForm({ onTextExtracted }: UploadFormProps) {
     onDrop,
     accept: { 'application/pdf': ['.pdf'] },
     maxFiles: 1,
-    maxSize: 30 * 1024 * 1024,
+    maxSize: MAX_FILE_SIZE,
     disabled: loading,
   })
 
@@ -116,7 +169,7 @@ export function UploadForm({ onTextExtracted }: UploadFormProps) {
                   <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
                   </svg>
-                  Max 30MB
+                  Max 9MB
                 </span>
               </div>
             </>
