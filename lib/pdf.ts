@@ -1,7 +1,32 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
+declare global {
+  var pdfjsWorker:
+    | {
+        WorkerMessageHandler: {
+          setup: (handler: unknown, port: unknown) => void
+        }
+      }
+    | undefined
+}
+
+let workerHandlerPromise: Promise<void> | null = null
+
+async function ensureWorkerHandler() {
+  if (globalThis.pdfjsWorker) return
+  if (!workerHandlerPromise) {
+    workerHandlerPromise = (async () => {
+      const { WorkerMessageHandler } = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+      globalThis.pdfjsWorker = { WorkerMessageHandler }
+    })()
+  }
+  await workerHandlerPromise
+}
+
 export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
   const start = Date.now()
+  await ensureWorkerHandler()
+
   const data = new Uint8Array(buffer)
 
   console.log('[PDF] Starting extraction, buffer size:', buffer.length)
