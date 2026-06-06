@@ -4,27 +4,21 @@ import { validateUploadFile } from '@/lib/validators'
 
 export async function POST(req: NextRequest) {
   const start = Date.now()
-  console.log('[Upload API] POST /api/upload started')
+  console.log('[Upload API] POST /api/upload')
 
   try {
     const formData = await req.formData()
     const file = formData.get('file')
 
-    console.log('[Upload API] FormData parsed', `(${Date.now() - start}ms)`)
-
     if (!file || !(file instanceof File)) {
-      console.error('[Upload API] No file in request')
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'No file provided' } },
         { status: 400 },
       )
     }
 
-    console.log('[Upload API] File received:', file.name, `(${(file.size / 1024).toFixed(1)} KB)`)
-
     const validationError = validateUploadFile(file)
     if (validationError) {
-      console.error('[Upload API] Validation failed:', validationError)
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: validationError } },
         { status: 400 },
@@ -32,11 +26,9 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    console.log('[Upload API] Buffer created', `(${Date.now() - start}ms)`)
-
     const text = await extractTextFromBuffer(buffer)
 
-    console.log('[Upload API] Success, text length:', text.length, `(${Date.now() - start}ms)`)
+    console.log('[Upload API] Done:', text.length, 'chars', `(${Date.now() - start}ms)`)
     return NextResponse.json({ success: true, data: { text } })
   } catch (err) {
     const elapsed = Date.now() - start

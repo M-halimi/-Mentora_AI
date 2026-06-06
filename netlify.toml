@@ -1,6 +1,11 @@
 [build]
-command = "npm run build"
-publish = ".next"
+  command = "npm run build"
+  publish = ".next"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["node_modules/pdfjs-dist/**"]
+  external_node_modules = ["pdfjs-dist"]
 
 [[plugins]]
-package = "@netlify/plugin-nextjs"
+  package = "@netlify/plugin-nextjs"

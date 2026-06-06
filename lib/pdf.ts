@@ -1,6 +1,4 @@
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
-
-GlobalWorkerOptions.workerSrc = ''
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
   const start = Date.now()
