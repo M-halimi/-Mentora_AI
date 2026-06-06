@@ -1,65 +1,142 @@
-import Image from "next/image";
+'use client'
+
+import { useState } from 'react'
+import { UploadForm } from '@/components/UploadForm'
+import { QuizResults } from '@/components/QuizResults'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { ErrorMessage } from '@/components/ErrorMessage'
+import { QuizQuestion } from '@/types'
+import { Footer } from "@/components/Footer"
+type Step = 'idle' | 'generating' | 'complete' | 'error'
 
 export default function Home() {
+  const [step, setStep] = useState<Step>('idle')
+  const [text, setText] = useState('')
+  const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [error, setError] = useState('')
+
+  async function handleTextExtracted(extracted: string) {
+    setText(extracted)
+    setStep('generating')
+
+    try {
+      const res = await fetch('/api/generate-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: extracted }),
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setError(json.error?.message || json.error || 'Quiz generation failed')
+        setStep('error')
+        return
+      }
+
+      setQuestions(json.data.questions)
+      setStep('complete')
+    } catch {
+      setError('Network error during quiz generation.')
+      setStep('error')
+    }
+  }
+
+  function handleReset() {
+    setStep('idle')
+    setText('')
+    setQuestions([])
+    setError('')
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+      <header className="border-b border-zinc-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-sm shadow-indigo-200">
+              <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
+              </svg>
+            </div>
+            <span className="text-base font-semibold text-zinc-900">Teacher Copilot</span>
+          </div>
+          {step === 'complete' && (
+            <button
+              onClick={handleReset}
+              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300 transition-all"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              New quiz
+            </button>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      {/* Main */}
+      <main className="flex flex-1 flex-col items-center px-5 py-16">
+        {step === 'idle' && (
+          <div className="w-full max-w-lg animate-slide-up">
+            {/* Hero */}
+            <div className="mb-10 text-center">
+              <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-200">
+                <svg className="size-8 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+                Generate a Quiz from Any Lesson
+              </h1>
+              <p className="mt-3 text-base text-zinc-500 max-w-md mx-auto leading-relaxed">
+                Upload a PDF and let AI create 10 multiple-choice questions instantly. Perfect for test prep, review, and self-study.
+              </p>
+            </div>
+            <UploadForm onTextExtracted={handleTextExtracted} />
+          </div>
+        )}
+
+        {step === 'generating' && (
+          <div className="w-full max-w-lg animate-slide-up">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+              <LoadingSpinner message="Generating your quiz with AI..." step="generating" />
+              <div className="mt-6 flex justify-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-indigo-300 animate-pulse-soft" style={{ animationDelay: '0ms' }} />
+                <span className="size-1.5 rounded-full bg-indigo-400 animate-pulse-soft" style={{ animationDelay: '300ms' }} />
+                <span className="size-1.5 rounded-full bg-indigo-500 animate-pulse-soft" style={{ animationDelay: '600ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'complete' && (
+          <div className="w-full animate-slide-up">
+            <QuizResults questions={questions} onReset={handleReset} />
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div className="w-full max-w-lg animate-slide-up">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+              <ErrorMessage message={error} onDismiss={handleReset} />
+              <div className="mt-4 text-center">
+                <button
+                  onClick={handleReset}
+                  className="rounded-xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-all"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+        <>
+            {/* your page content */}
+
+            <Footer />
+          </>
+  
     </div>
-  );
+  )
 }

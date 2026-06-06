@@ -1,0 +1,90 @@
+import { QuizQuestion } from '@/types'
+import { jsPDF } from 'jspdf'
+
+export function downloadJSON(questions: QuizQuestion[], filename = 'quiz.json') {
+  const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function downloadPDF(questions: QuizQuestion[], title = 'Quiz') {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  function addPage() {
+    doc.addPage()
+    y = margin
+  }
+
+  function checkSpace(needed: number) {
+    const pageHeight = doc.internal.pageSize.getHeight()
+    if (y + needed > pageHeight - margin) {
+      addPage()
+    }
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  doc.text(title, pageWidth / 2, y, { align: 'center' })
+  y += 10
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(`Total Questions: ${questions.length}`, margin, y)
+  y += 8
+
+  doc.setDrawColor(200)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 8
+
+  questions.forEach((q, i) => {
+    const lines = doc.splitTextToSize(q.question, contentWidth)
+    const questionHeight = lines.length * 6 + 4 * 8 + 10
+
+    checkSpace(questionHeight)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text(`Question ${i + 1}`, margin, y)
+    y += 6
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.text(lines, margin, y)
+    y += lines.length * 5 + 4
+
+    const labels = ['A', 'B', 'C', 'D']
+    q.options.forEach((opt, oi) => {
+      const optLines = doc.splitTextToSize(`${labels[oi]}. ${opt}`, contentWidth - 6)
+      const optHeight = optLines.length * 5
+
+      checkSpace(optHeight + 6)
+
+      doc.setFont('helvetica', q.answer === opt ? 'bold' : 'normal')
+      doc.text(optLines, margin + 4, y)
+      y += optHeight + 2
+    })
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    const answerText = `Answer: ${q.answer}`
+    checkSpace(8)
+    doc.text(answerText, margin, y)
+    doc.setTextColor(0)
+    y += 6
+
+    doc.setDrawColor(230)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 6
+  })
+
+  doc.save('quiz.pdf')
+}
