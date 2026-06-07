@@ -1,12 +1,15 @@
-import Groq from "groq-sdk";
-import { QuizQuestion } from "@/types";
+import Groq from 'groq-sdk'
+import { QuizQuestion } from '@/types'
 
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
-});
+})
 
-export async function generateQuiz(text: string): Promise<QuizQuestion[]> {
-  const truncated = text.slice(0, 12000);
+async function fetchWithRetry(
+  text: string,
+  retries = 2
+): Promise<QuizQuestion[]> {
+  const truncated = text.slice(0, 12000)
 
   const prompt = `
 You are an expert language teacher and quiz generator.
@@ -30,39 +33,66 @@ FORMAT:
 
 LESSON:
 ${truncated}
-`;
+`
 
-  const completion = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [
-      {
-        role: "system",
-        content: "You are a strict JSON quiz generator.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    temperature: 0.2,
-  });
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      const completion = await client.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a strict JSON quiz generator.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.2,
+      })
 
-  const content = completion.choices[0]?.message?.content;
+      const content = completion.choices[0]?.message?.content
 
-  if (!content) {
-    throw new Error("Empty response from Groq");
+      if (!content) {
+        throw new Error('Empty response from Groq')
+      }
+
+      const cleaned = content
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim()
+
+      const parsed = JSON.parse(cleaned)
+
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('AI returned empty or invalid quiz format')
+      }
+
+      return parsed
+    } catch (err) {
+      if (attempt <= retries) {
+        console.warn(
+          `[Groq] Attempt ${attempt} failed, retrying...`,
+          err instanceof Error ? err.message : err
+        )
+        await new Promise((r) => setTimeout(r, 1000 * attempt))
+        continue
+      }
+      throw err
+    }
   }
 
-  // clean response (important)
-  const cleaned = content
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
+  throw new Error('Failed to generate quiz after retries')
+}
 
+export async function generateQuiz(text: string): Promise<QuizQuestion[]> {
   try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.log("RAW RESPONSE:", content);
-    throw new Error("Invalid JSON from AI");
+    return await fetchWithRetry(text)
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Quiz generation failed'
+    console.error('[Groq] Final error:', message)
+    throw new Error(message)
   }
 }
