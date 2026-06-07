@@ -1,12 +1,22 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Sora, DM_Sans } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const sora = Sora({
+  subsets: ['latin'],
+  variable: '--font-sora',
+  display: 'swap',
+})
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Teacher Copilot — AI Quiz Generator',
-  description: 'Upload a PDF lesson and instantly generate multiple-choice quizzes using AI.',
+  description: 'Upload a PDF and instantly generate multiple-choice quizzes using AI.',
 }
 
 export const viewport: Viewport = {
@@ -14,16 +24,24 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: light)', color: '#F7F7FB' },
+    { media: '(prefers-color-scheme: dark)', color: '#0D0D12' },
   ],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.className}>
-      <body className="min-h-screen bg-gradient-to-b from-white to-zinc-50 text-zinc-900 antialiased">
-        {children}
-      </body>
+    <html lang="en" className={`${sora.variable} ${dmSans.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()
+            `,
+          }}
+        />
+      </head>
+      <body>{children}</body>
     </html>
   )
 }

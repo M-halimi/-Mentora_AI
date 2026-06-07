@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateQuiz } from '@/lib/groq'
+import { withRateLimit } from '@/lib/rate-limit'
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   const start = Date.now()
   console.log('[QuizGen API] POST /api/generate-quiz started')
 
@@ -62,3 +63,5 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(handler)
