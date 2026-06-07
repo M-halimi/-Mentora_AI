@@ -5,6 +5,23 @@ const client = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 })
 
+/**
+ * Errors thrown by the Groq SDK carry a `status` property.
+ * We augment the error with it so the provider manager can
+ * classify 429 / quota errors by status code, not just message text.
+ */
+function annotateError(err: unknown): Error {
+  if (err instanceof Error) {
+    const annotated = err as Error & { status?: number; code?: string }
+    const raw = err as unknown as Record<string, unknown>
+    if (raw.status && typeof raw.status === 'number') {
+      annotated.status = raw.status as number
+    }
+    return annotated
+  }
+  return err instanceof Error ? err : new Error(String(err))
+}
+
 async function fetchWithRetry(
   text: string,
   retries = 2
@@ -70,11 +87,12 @@ ${truncated}
       }
 
       return parsed
-    } catch (err) {
+    } catch (raw) {
+      const err = annotateError(raw)
       if (attempt <= retries) {
         console.warn(
           `[Groq] Attempt ${attempt} failed, retrying...`,
-          err instanceof Error ? err.message : err
+          err.message
         )
         await new Promise((r) => setTimeout(r, 1000 * attempt))
         continue
@@ -89,10 +107,9 @@ ${truncated}
 export async function generateQuiz(text: string): Promise<QuizQuestion[]> {
   try {
     return await fetchWithRetry(text)
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Quiz generation failed'
-    console.error('[Groq] Final error:', message)
-    throw new Error(message)
+  } catch (raw) {
+    const err = annotateError(raw)
+    console.error('[Groq] Final error:', err.message)
+    throw err
   }
 }

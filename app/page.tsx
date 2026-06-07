@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { UploadForm } from '@/components/UploadForm'
 import { QuizResults } from '@/components/QuizResults'
+import { QuizProcessing } from '@/components/QuizProcessing'
 import { QuizQuestion } from '@/types'
 import { Footer } from '@/components/Footer'
 import { getVisitorId } from '@/lib/client-id'
@@ -15,6 +16,7 @@ export default function Home() {
   const [text, setText] = useState('')
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [error, setError] = useState('')
+  const [generationComplete, setGenerationComplete] = useState(false)
 
   async function handleTextExtracted(extracted: string) {
     setText(extracted)
@@ -28,7 +30,7 @@ export default function Home() {
     const controller = new AbortController()
     const timeout = setTimeout(() => {
       controller.abort()
-    }, 30_000)
+    }, 60_000)
 
     try {
       const res = await fetch('/api/generate-quiz', {
@@ -63,7 +65,7 @@ export default function Home() {
       }
 
       setQuestions(json.data.questions)
-      setStep('complete')
+      setGenerationComplete(true)
     } catch (err: unknown) {
       clearTimeout(timeout)
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -80,6 +82,7 @@ export default function Home() {
     setText('')
     setQuestions([])
     setError('')
+    setGenerationComplete(false)
   }
 
   return (
@@ -179,14 +182,12 @@ export default function Home() {
         )}
 
         {step === 'generating' && (
-          <div className="flex flex-col items-center gap-4 animate-fade-in">
-            <div
-              className="size-8 rounded-full border-2 animate-spin-slow"
-              style={{ borderColor: 'var(--border)', borderTopColor: '#6366F1' }}
+          <div className="w-full animate-fade-in flex justify-center" style={{ maxWidth: 560 }}>
+            <QuizProcessing
+              isComplete={generationComplete}
+              onTransitionToResults={() => setStep('complete')}
+              onReset={handleReset}
             />
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>
-              Generating your quiz with AI&hellip;
-            </p>
           </div>
         )}
 
