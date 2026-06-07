@@ -83,8 +83,12 @@ export async function POST(req: NextRequest) {
     const content = completion.choices[0]?.message?.content
     if (!content) throw new Error('Empty response')
 
-    const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim()
-    const reviews = JSON.parse(cleaned)
+    const start = content.indexOf('[')
+    const end = content.lastIndexOf(']')
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error('No JSON array found in response')
+    }
+    const reviews = JSON.parse(content.slice(start, end + 1))
 
     if (!Array.isArray(reviews)) {
       throw new Error('Response is not an array')

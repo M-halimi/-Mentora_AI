@@ -58,7 +58,7 @@ async function fetchWithRetry(
           'X-Title': 'Teacher Copilot',
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.1-70b-instruct',
+          model: 'meta-llama/llama-3.1-8b-instruct',
           messages: [
             {
               role: 'system',
@@ -95,8 +95,8 @@ async function fetchWithRetry(
         throw new Error('Invalid JSON returned by AI')
       }
 
-      if (!Array.isArray(parsed) || parsed.length !== 10) {
-        throw new Error('Invalid quiz format (must be 10 questions)')
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('OpenRouter returned empty or invalid quiz format')
       }
 
       return parsed
