@@ -105,7 +105,8 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
       if (!json.success) throw new Error(json.error || 'Review failed')
       setReviews(json.data)
       setReviewState('idle')
-    } catch {
+    } catch (err) {
+      console.error('[Review] Frontend error:', err instanceof Error ? err.message : err)
       setReviewState('error')
     }
   }

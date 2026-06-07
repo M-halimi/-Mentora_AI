@@ -36,16 +36,22 @@ function cleanJSON(text: string) {
     .trim()
 }
 
-async function fetchWithRetry(
-  text: string,
+export async function callOpenRouter(
+  messages: { role: string; content: string }[],
+  options?: {
+    model?: string
+    temperature?: number
+    max_tokens?: number
+  },
   retries = 2
-): Promise<QuizQuestion[]> {
-
+): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new Error('Missing OPENROUTER_API_KEY in environment variables')
   }
 
-  const truncated = text.slice(0, 12000)
+  const model = options?.model ?? 'meta-llama/llama-3.1-8b-instruct'
+  const temperature = options?.temperature ?? 0.2
+  const max_tokens = options?.max_tokens ?? 6000
 
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
@@ -58,19 +64,10 @@ async function fetchWithRetry(
           'X-Title': 'Teacher Copilot',
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.1-8b-instruct',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a strict JSON quiz generator.',
-            },
-            {
-              role: 'user',
-              content: PROMPT + truncated,
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 6000,
+          model,
+          messages,
+          temperature,
+          max_tokens,
         }),
       })
 
@@ -86,20 +83,7 @@ async function fetchWithRetry(
         throw new Error('Empty response from OpenRouter')
       }
 
-      let parsed
-
-      try {
-        parsed = JSON.parse(cleanJSON(content))
-      } catch (err) {
-        console.log('RAW RESPONSE:', content)
-        throw new Error('Invalid JSON returned by AI')
-      }
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('OpenRouter returned empty or invalid quiz format')
-      }
-
-      return parsed
+      return cleanJSON(content)
     } catch (err) {
       if (attempt <= retries) {
         console.warn(
@@ -120,7 +104,36 @@ export async function generateQuizViaOpenRouter(
   text: string
 ): Promise<QuizQuestion[]> {
   try {
-    return await fetchWithRetry(text)
+    const truncated = text.slice(0, 12000)
+
+    const content = await callOpenRouter(
+      [
+        {
+          role: 'system',
+          content: 'You are a strict JSON quiz generator.',
+        },
+        {
+          role: 'user',
+          content: PROMPT + truncated,
+        },
+      ],
+      { model: 'meta-llama/llama-3.1-8b-instruct', temperature: 0.2, max_tokens: 6000 }
+    )
+
+    let parsed
+
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      console.log('RAW RESPONSE:', content)
+      throw new Error('Invalid JSON returned by AI')
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('OpenRouter returned empty or invalid quiz format')
+    }
+
+    return parsed
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'OpenRouter failed completely'
