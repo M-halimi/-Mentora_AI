@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateQuiz } from '@/lib/groq'
+import { generateQuiz } from '@/lib/quiz-generator'
 import { withRateLimit } from '@/lib/rate-limit'
 
 async function handler(req: NextRequest) {

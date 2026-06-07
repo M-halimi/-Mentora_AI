@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { QuizQuestion, Explanation } from '@/types'
+import { QuizQuestion, Explanation, QuestionReview } from '@/types'
 import { downloadJSON, downloadPDF } from '@/lib/download'
+import { QuizReview } from './QuizReview'
 
 interface QuizResultsProps {
   questions: QuizQuestion[]
@@ -16,6 +17,8 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
   const [explaining, setExplaining] = useState<Record<number, boolean>>({})
   const [explainError, setExplainError] = useState<Record<number, string>>({})
   const [explainLang, setExplainLang] = useState<Record<number, 'base' | 'fr' | 'en' | 'de' | 'ar'>>({})
+  const [reviews, setReviews] = useState<QuestionReview[] | null>(null)
+  const [reviewState, setReviewState] = useState<'idle' | 'loading' | 'error'>('idle')
 
   const score = useMemo(() => {
     const correct = Object.entries(revealed).filter(
@@ -87,6 +90,23 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
     } catch {
       setShareState('error')
       setTimeout(() => setShareState('idle'), 2500)
+    }
+  }
+
+  async function handleReview() {
+    setReviewState('loading')
+    try {
+      const res = await fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions, userAnswers: revealed }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Review failed')
+      setReviews(json.data)
+      setReviewState('idle')
+    } catch {
+      setReviewState('error')
     }
   }
 
@@ -171,148 +191,181 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
           }
           {shareState === 'copied' ? 'Copied!' : shareState === 'error' ? 'Failed' : 'Share'}
         </button>
+        {allAnswered && !reviews && (
+          <button
+            onClick={handleReview}
+            disabled={reviewState === 'loading'}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors"
+            style={{
+              borderColor: 'rgba(99,102,241,0.3)',
+              color: reviewState === 'error' ? '#EF4444' : '#6366F1',
+              backgroundColor: reviewState === 'loading' ? 'var(--accent-soft)' : 'var(--accent-soft)',
+            }}
+          >
+            {reviewState === 'loading' ? (
+              <div className="size-3.5 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border)', borderTopColor: '#6366F1' }} />
+            ) : (
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+              </svg>
+            )}
+            {reviewState === 'loading' ? 'Analyzing...' : reviewState === 'error' ? 'Failed, try again' : 'Review Answers'}
+          </button>
+        )}
       </div>
 
-      {/* Questions */}
-      <div className="space-y-3">
-        {questions.map((q, i) => {
-          const selected = revealed[i] ?? null
-          const isCorrect = selected === q.answer
-          const isAnswered = selected !== null
-          const exp = explanations[i]
-          const isLoading = explaining[i]
-          const expErr = explainError[i]
+      {reviews ? (
+        <QuizReview reviews={reviews} score={score} onReset={onReset} />
+      ) : (
+        <>
+          {/* Questions */}
+          <div className="space-y-3">
+            {questions.map((q, i) => {
+              const selected = revealed[i] ?? null
+              const isCorrect = selected === q.answer
+              const isAnswered = selected !== null
+              const exp = explanations[i]
+              const isLoading = explaining[i]
+              const expErr = explainError[i]
 
-          return (
-            <div key={i} className="rounded-[18px] border p-5 transition-all duration-200" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
-              <div className="flex items-start justify-between mb-3">
-                <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: 'var(--accent-soft)', color: '#6366F1' }}>
-                  Question {i + 1}
-                </span>
-                {isAnswered && (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${isCorrect ? '' : ''}`} style={{ color: isCorrect ? '#10B981' : '#EF4444' }}>
-                    <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      {isCorrect ? <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        : <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />}
-                    </svg>
-                    {isCorrect ? 'Correct' : 'Incorrect'}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text)' }}>{q.question}</p>
-
-              <div className="mt-3 space-y-1.5">
-                {q.options?.map((opt) => {
-                  const isSelected = selected === opt
-                  const isAnswer = q.answer === opt
-                  let optStyle: React.CSSProperties = { borderColor: 'var(--border)', color: 'var(--text)' }
-                  if (isAnswered) {
-                    if (isAnswer) optStyle = { borderColor: 'rgba(16,185,129,0.4)', backgroundColor: 'var(--success-soft)', color: '#10B981' }
-                    else if (isSelected && !isCorrect) optStyle = { borderColor: 'rgba(239,68,68,0.4)', backgroundColor: 'var(--error-soft)', color: '#EF4444' }
-                    else optStyle = { borderColor: 'var(--border)', color: 'var(--muted)', opacity: 0.5 }
-                  }
-
-                  return (
-                    <button key={opt} onClick={() => handleSelect(i, opt)} disabled={isAnswered}
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-left text-[13px] transition-all duration-150 active:scale-[0.99] flex items-start gap-2.5"
-                      style={optStyle}
-                    >
-                      <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded text-[10px] font-semibold border" style={{
-                        borderColor: isAnswered && isAnswer ? 'transparent' : isAnswered && isSelected && !isCorrect ? 'transparent' : 'var(--border)',
-                        backgroundColor: isAnswered && isAnswer ? '#10B981' : isAnswered && isSelected && !isCorrect ? '#EF4444' : 'transparent',
-                        color: isAnswered && (isAnswer || (isSelected && !isCorrect)) ? 'white' : 'var(--muted)',
-                      }}>
-                        {String.fromCharCode(65 + q.options.indexOf(opt))}
-                      </span>
-                      <span className="pt-0.5 leading-snug">{opt}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {isAnswered && !isCorrect && (
-                <div className="mt-2.5 rounded-lg px-3 py-2 border text-xs" style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.2)', color: '#D97706' }}>
-                  <span className="font-medium">Correct answer:</span> {q.answer}
-                </div>
-              )}
-
-              {isAnswered && !exp && !isLoading && !expErr && (
-                <button onClick={() => handleExplain(i)} className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium transition-colors" style={{ color: '#6366F1' }}>
-                  <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-                  </svg>
-                  Explain this answer
-                </button>
-              )}
-
-              {isLoading && (
-                <div className="mt-2.5 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
-                  <div className="size-3 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border)', borderTopColor: '#6366F1' }} />
-                  Getting explanation...
-                </div>
-              )}
-
-              {expErr && <p className="mt-2 text-[11px]" style={{ color: '#EF4444' }}>{expErr}</p>}
-
-              {exp && (
-                <div className="mt-3 rounded-xl border p-4 animate-fade-in" style={{ borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'var(--accent-soft)' }}>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border" style={{
-                      color: exp.status === 'Correct' ? '#10B981' : '#EF4444',
-                      borderColor: exp.status === 'Correct' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
-                      backgroundColor: exp.status === 'Correct' ? 'var(--success-soft)' : 'var(--error-soft)',
-                    }}>
-                      {exp.status}
+              return (
+                <div key={i} className="rounded-[18px] border p-5 transition-all duration-200" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: 'var(--accent-soft)', color: '#6366F1' }}>
+                      Question {i + 1}
                     </span>
-                    <span className="text-[10px] font-medium" style={{ color: '#6366F1' }}>Teacher&apos;s Explanation</span>
+                    {isAnswered && (
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${isCorrect ? '' : ''}`} style={{ color: isCorrect ? '#10B981' : '#EF4444' }}>
+                        <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          {isCorrect ? <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            : <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />}
+                        </svg>
+                        {isCorrect ? 'Correct' : 'Incorrect'}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex gap-1 mb-2.5 overflow-x-auto scrollbar-none">
-                    {(['base', 'en', 'fr', 'de', 'ar'] as const).map((lang) => {
-                      const current = explainLang[i] || 'base'
+                  <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text)' }}>{q.question}</p>
+
+                  <div className="mt-3 space-y-1.5">
+                    {q.options?.map((opt) => {
+                      const isSelected = selected === opt
+                      const isAnswer = q.answer === opt
+                      let optStyle: React.CSSProperties = { borderColor: 'var(--border)', color: 'var(--text)' }
+                      if (isAnswered) {
+                        if (isAnswer) optStyle = { borderColor: 'rgba(16,185,129,0.4)', backgroundColor: 'var(--success-soft)', color: '#10B981' }
+                        else if (isSelected && !isCorrect) optStyle = { borderColor: 'rgba(239,68,68,0.4)', backgroundColor: 'var(--error-soft)', color: '#EF4444' }
+                        else optStyle = { borderColor: 'var(--border)', color: 'var(--muted)', opacity: 0.5 }
+                      }
+
                       return (
-                        <button key={lang} onClick={() => setExplainLang((prev) => ({ ...prev, [i]: lang }))}
-                          className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all active:scale-[0.97]"
-                          style={{
-                            backgroundColor: current === lang ? 'rgba(99,102,241,0.15)' : 'transparent',
-                            color: current === lang ? '#6366F1' : 'var(--muted)',
-                          }}
+                        <button key={opt} onClick={() => handleSelect(i, opt)} disabled={isAnswered}
+                          className="w-full rounded-xl border px-3.5 py-2.5 text-left text-[13px] transition-all duration-150 active:scale-[0.99] flex items-start gap-2.5"
+                          style={optStyle}
                         >
-                          {lang === 'base' ? 'Base' : lang.toUpperCase()}
+                          <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded text-[10px] font-semibold border" style={{
+                            borderColor: isAnswered && isAnswer ? 'transparent' : isAnswered && isSelected && !isCorrect ? 'transparent' : 'var(--border)',
+                            backgroundColor: isAnswered && isAnswer ? '#10B981' : isAnswered && isSelected && !isCorrect ? '#EF4444' : 'transparent',
+                            color: isAnswered && (isAnswer || (isSelected && !isCorrect)) ? 'white' : 'var(--muted)',
+                          }}>
+                            {String.fromCharCode(65 + q.options.indexOf(opt))}
+                          </span>
+                          <span className="pt-0.5 leading-snug">{opt}</span>
                         </button>
                       )
                     })}
                   </div>
 
-                  {(() => {
-                    const l = explainLang[i] || 'base'
-                    const sections: [string, keyof Explanation][] = [['Explanation', 'explanation'], ['Grammar Rule', 'grammar_rule'], ['Example', 'example'], ['Tip', 'tip']]
-                    return sections.map(([label, key]) => (
-                      <div key={key} className={label !== 'Tip' ? 'mb-2' : ''}>
-                        <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>{label}</p>
-                        <p className="text-xs" style={{ color: 'var(--text)', fontStyle: key === 'example' ? 'italic' : 'normal' }}>
-                          {(exp[key] as unknown as Record<string, string>)[l]}
-                        </p>
-                      </div>
-                    ))
-                  })()}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                  {isAnswered && !isCorrect && (
+                    <div className="mt-2.5 rounded-lg px-3 py-2 border text-xs" style={{ backgroundColor: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.2)', color: '#D97706' }}>
+                      <span className="font-medium">Correct answer:</span> {q.answer}
+                    </div>
+                  )}
 
-      {/* Bottom CTA */}
-      <div className="text-center pt-2 pb-8">
-        <button onClick={onReset} className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.97]" style={{ backgroundColor: '#6366F1', fontFamily: 'var(--font-sora)' }}>
-          <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-          </svg>
-          Upload another PDF
-        </button>
-      </div>
+                  {isAnswered && !exp && !isLoading && !expErr && (
+                    <button onClick={() => handleExplain(i)} className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium transition-colors" style={{ color: '#6366F1' }}>
+                      <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+                      </svg>
+                      Explain this answer
+                    </button>
+                  )}
+
+                  {isLoading && (
+                    <div className="mt-2.5 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                      <div className="size-3 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border)', borderTopColor: '#6366F1' }} />
+                      Getting explanation...
+                    </div>
+                  )}
+
+                  {expErr && <p className="mt-2 text-[11px]" style={{ color: '#EF4444' }}>{expErr}</p>}
+
+                  {exp && (
+                    <div className="mt-3 rounded-xl border p-4 animate-fade-in" style={{ borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'var(--accent-soft)' }}>
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold border" style={{
+                          color: exp.isCorrect ? '#10B981' : '#EF4444',
+                          borderColor: exp.isCorrect ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
+                          backgroundColor: exp.isCorrect ? 'var(--success-soft)' : 'var(--error-soft)',
+                        }}>
+                          {exp.isCorrect ? 'Correct' : 'Incorrect'}
+                        </span>
+                        <span className="text-[10px] font-medium" style={{ color: '#6366F1' }}>Teacher&apos;s Explanation</span>
+                      </div>
+
+                      <div className="flex gap-1 mb-2.5 overflow-x-auto scrollbar-none">
+                        {(['base', 'en', 'fr', 'de', 'ar'] as const).map((lang) => {
+                          const current = explainLang[i] || 'base'
+                          return (
+                            <button key={lang} onClick={() => setExplainLang((prev) => ({ ...prev, [i]: lang }))}
+                              className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all active:scale-[0.97]"
+                              style={{
+                                backgroundColor: current === lang ? 'rgba(99,102,241,0.15)' : 'transparent',
+                                color: current === lang ? '#6366F1' : 'var(--muted)',
+                              }}
+                            >
+                              {lang === 'base' ? 'Base' : lang.toUpperCase()}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {(() => {
+                        const l = explainLang[i] || 'base'
+                        const t = l === 'base' ? null : exp.translations?.[l as 'en' | 'fr' | 'de' | 'ar']
+                        const sections: { label: string; text: string }[] = [
+                          { label: 'Explanation', text: t ? t.explanation : exp.base },
+                          { label: 'Grammar Rule', text: t ? t.grammarRule : exp.grammarRule },
+                          { label: 'Example', text: t ? t.example : exp.example },
+                          { label: 'Tip', text: t ? t.tip : exp.tip },
+                        ]
+                        return sections.map((s) => (
+                          <div key={s.label} className={s.label !== 'Tip' ? 'mb-2' : ''}>
+                            <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>{s.label}</p>
+                            <p className="text-xs" style={{ color: 'var(--text)', fontStyle: s.label === 'Example' ? 'italic' : 'normal' }}>
+                              {s.text}
+                            </p>
+                          </div>
+                        ))
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Bottom CTA */}
+          <div className="text-center pt-2 pb-8">
+            <button onClick={onReset} className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.97]" style={{ backgroundColor: '#6366F1', fontFamily: 'var(--font-sora)' }}>
+              <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+              </svg>
+              Upload another PDF
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

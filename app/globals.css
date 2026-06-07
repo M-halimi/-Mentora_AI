@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 
+/* Google Fonts loaded via <link> in layout.tsx */
+
 :root {
+  --font-sora: 'Sora', sans-serif;
+  --font-dm-sans: 'DM Sans', sans-serif;
   --bg: #F7F7FB;
   --surface: #FFFFFF;
   --border: rgba(0, 0, 0, 0.09);
@@ -83,3 +87,13 @@ html {
     min-height: 100dvh;
   }
 }
+
+@keyframes confetti {
+  0% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); opacity: 0; }
+}
+
+.animate-confetti {
+  animation: confetti linear forwards;
+}
+

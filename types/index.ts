@@ -26,10 +26,39 @@ export interface TranslatableContent {
   ar: string
 }
 
+export interface ExplainTranslation {
+  explanation: string
+  grammarRule: string
+  example: string
+  tip: string
+}
+
 export interface Explanation {
-  status: string
-  explanation: TranslatableContent
-  grammar_rule: TranslatableContent
-  example: TranslatableContent
-  tip: TranslatableContent
+  isCorrect: boolean
+  correctAnswer: string
+  userAnswer: string
+  base: string
+  grammarRule: string
+  example: string
+  tip: string
+  translations: {
+    en: ExplainTranslation
+    fr: ExplainTranslation
+    de: ExplainTranslation
+    ar: ExplainTranslation
+  }
+}
+
+export interface QuestionReview {
+  question: string
+  options: string[]
+  correctIndex: number
+  userIndex: number
+  isCorrect: boolean
+  userAnswer: string
+  correctAnswer: string
+  explanation: string
+  grammarRule: string
+  example: string
+  tip: string
 }

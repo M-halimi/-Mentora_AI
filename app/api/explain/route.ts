@@ -3,65 +3,54 @@ import Groq from 'groq-sdk'
 
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY! })
 
-const EXPLAIN_PROMPT = `You are an expert language teacher.
+const EXPLAIN_PROMPT = `You are an expert language teacher assistant.
 
-I will give you:
-1. A question
-2. Correct answer
-3. User answer
+A student just completed a quiz question. Analyze it and return a single JSON object.
 
-Your task is to analyze the mistake and generate a learning explanation.
+Return the explanation in 4 languages: English (en), French (fr), German (de), and Arabic (ar).
 
-OUTPUT RULES:
-- Return ONLY valid JSON
-- No markdown, no extra text
-- Keep explanations short and simple
-- Focus on learning
-
-YOU MUST RETURN THIS FORMAT:
-
+Return exactly this structure:
 {
-  "status": "Correct or Incorrect",
-
-  "explanation": {
-    "base": "Short explanation in simple neutral form (no language-specific words)",
-    "fr": "Same explanation translated into French",
-    "en": "Same explanation translated into English",
-    "de": "Same explanation translated into German",
-    "ar": "Same explanation translated into Arabic"
-  },
-
-  "grammar_rule": {
-    "base": "Grammar rule in neutral form",
-    "fr": "Rule in French",
-    "en": "Rule in English",
-    "de": "Rule in German",
-    "ar": "Rule in Arabic"
-  },
-
-  "example": {
-    "base": "Simple example sentence",
-    "fr": "Example in French",
-    "en": "Example in English",
-    "de": "Example in German",
-    "ar": "Example in Arabic"
-  },
-
-  "tip": {
-    "base": "Practice tip",
-    "fr": "Tip in French",
-    "en": "Tip in English",
-    "de": "Tip in German",
-    "ar": "Tip in Arabic"
+  "isCorrect": true,
+  "correctAnswer": "the correct option text",
+  "userAnswer": "what the student picked",
+  "base": "simple one sentence — correct or wrong feedback",
+  "grammarRule": "short rule max 6 words",
+  "example": "one short example sentence",
+  "tip": "one practical tip",
+  "translations": {
+    "en": {
+      "explanation": "explanation in English",
+      "grammarRule": "rule in English",
+      "example": "example in English",
+      "tip": "tip in English"
+    },
+    "fr": {
+      "explanation": "explanation in French",
+      "grammarRule": "rule in French",
+      "example": "example in French",
+      "tip": "tip in French"
+    },
+    "de": {
+      "explanation": "explanation in German",
+      "grammarRule": "rule in German",
+      "example": "example in German",
+      "tip": "tip in German"
+    },
+    "ar": {
+      "explanation": "explanation in Arabic",
+      "grammarRule": "rule in Arabic",
+      "example": "example in Arabic",
+      "tip": "tip in Arabic"
+    }
   }
 }
 
-IMPORTANT:
-- Keep meaning EXACT across languages
-- Do NOT add extra text outside JSON
-- Make translations consistent (same idea, not different meaning)
-- Keep everything short and beginner-friendly
-- Focus on education, not long explanations`
+RULES:
+- Return ONLY valid JSON, no markdown, no backticks, no extra text
+- base field: if correct say "The user answered correctly." if wrong say "The correct answer is [correctAnswer]."
+- grammarRule and example and tip at root level → write in the same language as the question
+- All 4 translations must always be present`
 
 export async function POST(req: NextRequest) {
   try {
