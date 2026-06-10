@@ -1,7 +1,7 @@
 import { Redis } from '@upstash/redis'
 import { generateQuiz as groqGenerate } from '@/lib/groq'
 import { generateQuizViaOpenRouter } from '@/lib/openrouter'
-import { QuizQuestion } from '@/types'
+import { QuizQuestion, QuizConfig } from '@/types'
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -136,11 +136,11 @@ function log(event: string, provider: string, detail?: string) {
 
 // ─── Provider Functions ─────────────────────────────────────
 
-async function callGroq(text: string): Promise<QuizQuestion[]> {
+async function callGroq(text: string, config: QuizConfig): Promise<QuizQuestion[]> {
   log('attempt', 'groq')
 
   try {
-    const result = await groqGenerate(text)
+    const result = await groqGenerate(text, config)
     log('success', 'groq', `${result.length} questions generated`)
     return result
   } catch (err) {
@@ -156,11 +156,11 @@ async function callGroq(text: string): Promise<QuizQuestion[]> {
   }
 }
 
-async function callOpenRouter(text: string): Promise<QuizQuestion[]> {
+async function callOpenRouter(text: string, config: QuizConfig): Promise<QuizQuestion[]> {
   log('attempt', 'openrouter')
 
   try {
-    const result = await generateQuizViaOpenRouter(text)
+    const result = await generateQuizViaOpenRouter(text, config)
     log('success', 'openrouter', `${result.length} questions generated`)
     return result
   } catch (err) {
@@ -172,23 +172,23 @@ async function callOpenRouter(text: string): Promise<QuizQuestion[]> {
 
 // ─── Public API ─────────────────────────────────────────────
 
-export async function generateResponse(text: string): Promise<QuizQuestion[]> {
+export async function generateResponse(text: string, config: QuizConfig = { numQuestions: 10, difficulty: 'mixed', mode: 'practice' }): Promise<QuizQuestion[]> {
   await loadState()
 
   const groqHealthy = await checkGroqHealth()
 
   if (groqHealthy) {
     try {
-      return await callGroq(text)
+      return await callGroq(text, config)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       log('fallback', 'system', `Groq failed (${message}) — switching to OpenRouter`)
-      return await callOpenRouter(text)
+      return await callOpenRouter(text, config)
     }
   }
 
   log('unavailable', 'groq', `Status: ${groqState.status}`)
-  return await callOpenRouter(text)
+  return await callOpenRouter(text, config)
 }
 
 export async function checkGroqHealth(): Promise<boolean> {

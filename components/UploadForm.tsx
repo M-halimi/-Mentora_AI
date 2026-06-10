@@ -118,7 +118,7 @@ export function UploadForm({ onTextExtracted, onGenerate }: UploadFormProps) {
     setSuccess(false)
   }
 
-  function handleGenerate() { onGenerate() }
+  function handleProceedToConfig() { onGenerate() }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -200,14 +200,14 @@ export function UploadForm({ onTextExtracted, onGenerate }: UploadFormProps) {
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                handleGenerate()
+                handleProceedToConfig()
               }}
               className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.97]"
               style={{ backgroundColor: '#6366F1', fontFamily: 'var(--font-sora)' }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4F46E5')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#6366F1')}
             >
-              Generate Quiz
+              Configure Quiz
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>

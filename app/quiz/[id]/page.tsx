@@ -1,14 +1,20 @@
 'use client'
 
-import { use, useEffect, useState } from 'react'
+import { use, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { QuizQuestion } from '@/types'
+import { NamePromptModal, getNameFromSession } from '@/components/NamePromptModal'
 
 export default function SharedQuizPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [questions, setQuestions] = useState<QuizQuestion[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [userName, setUserName] = useState<string | null>(() => getNameFromSession())
+
+  const handleNameSet = useCallback((name: string) => {
+    setUserName(name)
+  }, [])
 
   useEffect(() => {
     fetch(`/api/quiz/${id}`)
@@ -131,6 +137,7 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
           </Link>
         </div>
       </div>
+      {!userName && <NamePromptModal onNameSet={handleNameSet} />}
     </div>
   )
 }

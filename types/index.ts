@@ -67,6 +67,12 @@ export interface QuestionReview {
   topic: string
 }
 
+export interface QuizConfig {
+  numQuestions: 10 | 15 | 20 | 25
+  difficulty: 'easy' | 'medium' | 'hard' | 'mixed'
+  mode: 'practice' | 'exam'
+}
+
 export interface StudentResult {
   id: string
   studentName: string

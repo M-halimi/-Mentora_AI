@@ -1,15 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { UploadForm } from '@/components/UploadForm'
 import { QuizResults } from '@/components/QuizResults'
 import { QuizProcessing } from '@/components/QuizProcessing'
-import { QuizQuestion } from '@/types'
+import { QuizConfigModal } from '@/components/QuizConfigModal'
+import { QuizTimer } from '@/components/QuizTimer'
+import { QuizQuestion, QuizConfig } from '@/types'
 import { Footer } from '@/components/Footer'
 import { getVisitorId } from '@/lib/client-id'
+import { NamePromptModal, getNameFromSession } from '@/components/NamePromptModal'
+import { saveQuestions, saveSnapshot, clearAllQuizSession, clearSnapshot, loadSnapshot } from '@/lib/quiz-session'
+import { useQuizTimer } from '@/hooks/useQuizTimer'
+import { useNavigationGuard } from '@/hooks/useNavigationGuard'
 
-type Step = 'idle' | 'uploading' | 'ready' | 'generating' | 'complete' | 'error'
+type Step = 'idle' | 'uploading' | 'ready' | 'config' | 'generating' | 'complete' | 'error'
 
 export default function Home() {
   const [step, setStep] = useState<Step>('idle')
@@ -17,14 +23,69 @@ export default function Home() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [error, setError] = useState('')
   const [generationComplete, setGenerationComplete] = useState(false)
+  const [userName, setUserName] = useState<string | null>(() => getNameFromSession())
+  const [config, setConfig] = useState<QuizConfig | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const isGeneratingRef = useRef(false)
+  const timerDuration = useMemo(() => config?.mode === 'exam' ? 30 * 60 : 60 * 60, [config])
+
+  const handleAutoSubmit = useCallback(() => {
+    setSubmitted(true)
+  }, [])
+
+  const timer = useQuizTimer(timerDuration, { onAutoSubmit: handleAutoSubmit }, submitted === false && step === 'complete' && questions.length > 0)
+
+  const navGuard = useNavigationGuard(
+    step === 'complete' && !submitted,
+    step === 'complete' ? { questions, revealed: {}, step, config } : null
+  )
+
+  useEffect(() => {
+    if (step === 'complete' && questions.length > 0) {
+      saveSnapshot({ questions, revealed: {}, step, config })
+    }
+  }, [step, questions, config])
+
+  useEffect(() => {
+    if (step === 'idle') {
+      const saved = loadSnapshot()
+      if (saved && saved.questions?.length > 0) {
+        const shouldRestore = window.confirm(
+          'You have an unfinished quiz. Would you like to continue where you left off?'
+        )
+        if (shouldRestore) {
+          setQuestions(saved.questions)
+          setConfig(saved.config)
+          setStep('complete')
+          clearSnapshot()
+        } else {
+          clearAllQuizSession()
+        }
+      }
+    }
+  }, [])
 
   async function handleTextExtracted(extracted: string) {
     setText(extracted)
     setStep('ready')
   }
 
-  async function handleGenerate() {
-    if (!text) return
+  const handleNameSet = useCallback((name: string) => {
+    setUserName(name)
+  }, [])
+
+  function handleProceedToConfig() {
+    setStep('config')
+  }
+
+  function handleCancelConfig() {
+    setStep('ready')
+  }
+
+  async function handleGenerate(quizConfig: QuizConfig) {
+    if (!text || isGeneratingRef.current) return
+    isGeneratingRef.current = true
+    setConfig(quizConfig)
     setStep('generating')
 
     const controller = new AbortController()
@@ -39,7 +100,7 @@ export default function Home() {
           'Content-Type': 'application/json',
           'x-visitor-id': getVisitorId(),
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...quizConfig }),
         signal: controller.signal,
       })
 
@@ -70,6 +131,7 @@ export default function Home() {
         return
       }
       setQuestions(json.data.questions)
+      saveQuestions(json.data.questions)
       setGenerationComplete(true)
     } catch (err: unknown) {
       clearTimeout(timeout)
@@ -79,6 +141,8 @@ export default function Home() {
         setError('Network error during quiz generation.')
       }
       setStep('error')
+    } finally {
+      isGeneratingRef.current = false
     }
   }
 
@@ -88,6 +152,7 @@ export default function Home() {
     setQuestions([])
     setError('')
     setGenerationComplete(false)
+    setConfig(null)
   }
 
   return (
@@ -136,6 +201,12 @@ export default function Home() {
               href="/dashboard"
               className="text-[11px] font-medium transition-colors"
               style={{ color: 'var(--muted)' }}
+              onClick={(e) => {
+                if (step === 'complete' && !submitted) {
+                  const leave = window.confirm('You will lose your progress. Are you sure?')
+                  if (!leave) e.preventDefault()
+                }
+              }}
             >
               Dashboard
             </a>
@@ -185,13 +256,19 @@ export default function Home() {
                       fontFamily: 'var(--font-dm-sans)',
                     }}
                   >
-                    Upload a PDF and let AI create 10 multiple-choice questions
+                    Upload a PDF and let AI create multiple-choice questions
                     instantly. Perfect for test prep, review, and self-study.
                   </p>
                 </div>
               </>
             )}
-            <UploadForm key="upload" onTextExtracted={handleTextExtracted} onGenerate={handleGenerate} />
+            <UploadForm key="upload" onTextExtracted={handleTextExtracted} onGenerate={handleProceedToConfig} />
+          </div>
+        )}
+
+        {step === 'config' && (
+          <div className="w-full animate-fade-in" style={{ maxWidth: 480 }}>
+            <QuizConfigModal onConfirm={handleGenerate} onCancel={handleCancelConfig} />
           </div>
         )}
 
@@ -206,9 +283,12 @@ export default function Home() {
         )}
 
         {step === 'complete' && (
-          <div className="w-full animate-fade-in" style={{ maxWidth: 500 }}>
-            <QuizResults questions={questions} onReset={handleReset} />
-          </div>
+          <>
+            <QuizTimer formatted={timer.formatted} progress={timer.progress} phase={timer.phase} />
+            <div className="w-full animate-fade-in" style={{ maxWidth: 500 }}>
+              <QuizResults questions={questions} onReset={handleReset} forceSubmitted={submitted} mode={config?.mode ?? 'practice'} />
+            </div>
+          </>
         )}
 
         {step === 'error' && (
@@ -238,6 +318,7 @@ export default function Home() {
       </main>
 
       <Footer />
+      {!userName && <NamePromptModal onNameSet={handleNameSet} />}
     </div>
   )
 }

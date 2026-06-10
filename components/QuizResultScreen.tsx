@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import Link from 'next/link'
 import { QuestionReview } from '@/types'
 
 interface QuizResultScreenProps {
@@ -49,6 +50,19 @@ export function QuizResultScreen({ score, reviews, onViewFullReview, onReset }: 
 
   return (
     <div className="w-full animate-fade-in space-y-5">
+      {/* Step indicator */}
+      <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium">
+        <span className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: '#6366F1', color: 'white' }}>
+          Score
+        </span>
+        <span className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--muted)' }}>
+          Review
+        </span>
+        <span className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--muted)' }}>
+          Analysis
+        </span>
+      </div>
+
       {/* Score Card */}
       <div className="rounded-[18px] border p-6 text-center" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
         <div
@@ -145,12 +159,25 @@ export function QuizResultScreen({ score, reviews, onViewFullReview, onReset }: 
           onClick={onViewFullReview}
           className="inline-flex items-center gap-1.5 rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all active:scale-[0.97]"
           style={{ backgroundColor: '#6366F1', fontFamily: 'var(--font-sora)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
         >
-          View Full Review
           <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m9 5.25 6.75 6.75L9 18.75" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
           </svg>
+          View Analysis
         </button>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
+          style={{ color: 'var(--muted)' }}
+        >
+          <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+          </svg>
+          Back to Dashboard
+        </Link>
         <button
           onClick={onReset}
           className="inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
@@ -159,7 +186,7 @@ export function QuizResultScreen({ score, reviews, onViewFullReview, onReset }: 
           <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
           </svg>
-          New Quiz
+          Generate New Quiz
         </button>
       </div>
     </div>

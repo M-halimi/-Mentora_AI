@@ -1,15 +1,10 @@
 import Groq from 'groq-sdk'
-import { QuizQuestion } from '@/types'
+import { QuizQuestion, QuizConfig } from '@/types'
 
 const client = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 })
 
-/**
- * Errors thrown by the Groq SDK carry a `status` property.
- * We augment the error with it so the provider manager can
- * classify 429 / quota errors by status code, not just message text.
- */
 function annotateError(err: unknown): Error {
   if (err instanceof Error) {
     const annotated = err as Error & { status?: number; code?: string }
@@ -24,20 +19,34 @@ function annotateError(err: unknown): Error {
 
 async function fetchWithRetry(
   text: string,
+  config: QuizConfig,
   retries = 2
 ): Promise<QuizQuestion[]> {
   const truncated = text.slice(0, 12000)
+
+  const difficultyInstruction = {
+    easy: 'Questions should be straightforward, testing basic understanding.',
+    medium: 'Questions should require moderate comprehension and application.',
+    hard: 'Questions should be challenging, requiring deep analysis and synthesis.',
+    mixed: 'Mix of easy, medium, and hard questions for balanced difficulty.',
+  }[config.difficulty]
+
+  const modeInstruction = config.mode === 'exam'
+    ? 'Do NOT include any hints or explanations in the output. Return only the JSON array of questions.'
+    : ''
 
   const prompt = `
 You are an expert language teacher and quiz generator.
 
 STRICT RULES:
 - Return ONLY valid JSON
-- Exactly 10 MCQ questions
+- Exactly ${config.numQuestions} MCQ questions
 - Each question has exactly 4 options
 - Only one correct answer per question
 - The "answer" field must be the FULL TEXT of the correct option, not a letter
 - No explanations, no markdown
+- ${difficultyInstruction}
+- ${modeInstruction}
 
 FORMAT:
 [
@@ -104,9 +113,9 @@ ${truncated}
   throw new Error('Failed to generate quiz after retries')
 }
 
-export async function generateQuiz(text: string): Promise<QuizQuestion[]> {
+export async function generateQuiz(text: string, config: QuizConfig): Promise<QuizQuestion[]> {
   try {
-    return await fetchWithRetry(text)
+    return await fetchWithRetry(text, config)
   } catch (raw) {
     const err = annotateError(raw)
     console.error('[Groq] Final error:', err.message)

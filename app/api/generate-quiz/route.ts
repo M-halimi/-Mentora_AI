@@ -7,7 +7,7 @@ async function handler(req: NextRequest) {
   console.log('[QuizGen API] POST /api/generate-quiz started')
 
   try {
-    let body: { text?: string }
+    let body: { text?: string; numQuestions?: number; difficulty?: string; mode?: string }
     try {
       body = await req.json()
     } catch {
@@ -33,9 +33,21 @@ async function handler(req: NextRequest) {
       )
     }
 
-    console.log('[QuizGen API] Text length:', text.length)
+    const numQuestions = [10, 15, 20, 25].includes(body.numQuestions ?? 10)
+      ? (body.numQuestions as 10 | 15 | 20 | 25)
+      : 10
 
-    const quiz = await generateQuiz(text)
+    const difficulty = ['easy', 'medium', 'hard', 'mixed'].includes(body.difficulty ?? 'mixed')
+      ? (body.difficulty as 'easy' | 'medium' | 'hard' | 'mixed')
+      : 'mixed'
+
+    const mode = ['practice', 'exam'].includes(body.mode ?? 'practice')
+      ? (body.mode as 'practice' | 'exam')
+      : 'practice'
+
+    console.log('[QuizGen API] Text length:', text.length, `Config: ${numQuestions}Q, ${difficulty}, ${mode}`)
+
+    const quiz = await generateQuiz(text, { numQuestions, difficulty, mode })
 
     const questions = Array.isArray(quiz) ? quiz : []
 

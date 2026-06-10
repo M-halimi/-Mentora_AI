@@ -1,12 +1,13 @@
 'use client'
 
-import { Component, useState, useMemo } from 'react'
+import { Component, useState, useMemo, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { QuizQuestion, Explanation, QuestionReview } from '@/types'
 import { downloadJSON, downloadPDF } from '@/lib/download'
 import { QuizReview } from './QuizReview'
 import { QuizResultScreen } from './QuizResultScreen'
 import { SaveResultButton } from './SaveResultButton'
+import { saveRevealed, markSubmitted, isSubmitted, saveAnalysis, loadAnalysis } from '@/lib/quiz-session'
 
 class ReviewErrorBoundary extends Component<
   { children: ReactNode; onReset: () => void },
@@ -58,9 +59,11 @@ class ReviewErrorBoundary extends Component<
 interface QuizResultsProps {
   questions: QuizQuestion[]
   onReset: () => void
+  forceSubmitted?: boolean
+  mode?: 'practice' | 'exam'
 }
 
-export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
+export function QuizResults({ questions = [], onReset, forceSubmitted = false, mode = 'practice' }: QuizResultsProps) {
   const [revealed, setRevealed] = useState<Record<number, string>>({})
   const [shareState, setShareState] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle')
   const [explanations, setExplanations] = useState<Record<number, Explanation>>({})
@@ -70,6 +73,47 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
   const [reviews, setReviews] = useState<QuestionReview[] | null>(null)
   const [reviewState, setReviewState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [reviewStep, setReviewStep] = useState<'result' | 'review'>('result')
+  const [submitted, setSubmitted] = useState(false)
+  const isSubmittingRef = useRef(false)
+
+  const alreadySubmitted = isSubmitted(questions)
+  const allAnswered = Object.keys(revealed).length === questions.length
+
+  useEffect(() => {
+    const cached = loadAnalysis<QuestionReview[]>(questions)
+    if (cached && cached.length > 0) {
+      setReviews(cached)
+      setReviewState('idle')
+    }
+  }, [questions])
+
+  useEffect(() => {
+    if (alreadySubmitted && !reviews) {
+      setSubmitted(true)
+    }
+  }, [alreadySubmitted, reviews])
+
+  useEffect(() => {
+    saveRevealed(revealed)
+  }, [revealed])
+
+  const isLocked = forceSubmitted || submitted
+
+  useEffect(() => {
+    if (isLocked && (allAnswered || forceSubmitted) && !reviews && reviewState === 'idle') {
+      handleReview()
+    }
+  }, [isLocked, allAnswered, forceSubmitted, reviewState, reviews])
+
+  function handleSubmit() {
+    if (isSubmittingRef.current || reviews) return
+    isSubmittingRef.current = true
+    setSubmitted(true)
+    markSubmitted(questions)
+    if (allAnswered) {
+      handleReview()
+    }
+  }
 
   const score = useMemo(() => {
     const correct = Object.entries(revealed).filter(
@@ -79,7 +123,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
   }, [revealed, questions])
 
   function handleSelect(qIndex: number, option: string) {
-    if (revealed[qIndex]) return
+    if (revealed[qIndex] || isLocked) return
     setRevealed((prev) => ({ ...prev, [qIndex]: option }))
   }
 
@@ -150,7 +194,16 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
   }
 
   async function handleReview() {
+    if (reviews || reviewState === 'loading') return
     setReviewState('loading')
+
+    const cached = loadAnalysis<QuestionReview[]>(questions)
+    if (cached && cached.length > 0) {
+      setReviews(cached)
+      setReviewState('idle')
+      return
+    }
+
     try {
       const res = await fetch('/api/review', {
         method: 'POST',
@@ -166,6 +219,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
         throw new Error('Invalid review data received')
       }
       setReviews(json.data)
+      saveAnalysis(questions, json.data)
       setReviewState('idle')
     } catch (err) {
       console.error('[Review] Frontend error:', err instanceof Error ? err.message : err)
@@ -189,8 +243,6 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
       </div>
     )
   }
-
-  const allAnswered = Object.keys(revealed).length === questions.length
 
   return (
     <div className="w-full mx-auto space-y-5 animate-fade-in">
@@ -229,6 +281,45 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
         </div>
       </div>
 
+      {/* Submit Button */}
+      {!isLocked && (
+        <div className="flex justify-center pt-1">
+          <button
+            onClick={handleSubmit}
+            disabled={!allAnswered}
+            className="inline-flex items-center gap-1.5 rounded-xl px-8 py-3 text-sm font-semibold text-white transition-all active:scale-[0.97] disabled:opacity-40"
+            style={{ backgroundColor: '#6366F1', fontFamily: 'var(--font-sora)' }}
+            onMouseEnter={(e) => { if (allAnswered) e.currentTarget.style.backgroundColor = '#4F46E5' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+          >
+            <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            {allAnswered ? 'Submit Quiz' : `Answer all questions to submit`}
+          </button>
+        </div>
+      )}
+
+      {isLocked && !reviews && (
+        <div className="flex justify-center pt-1">
+          <div className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium" style={{ backgroundColor: 'var(--accent-soft)', color: '#6366F1' }}>
+            <div className="size-4 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border)', borderTopColor: '#6366F1' }} />
+            Submitting...
+          </div>
+        </div>
+      )}
+
+      {isLocked && reviews && (
+        <div className="flex justify-center pt-1">
+          <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium" style={{ backgroundColor: 'var(--success-soft)', color: '#10B981' }}>
+            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+            Quiz Submitted
+          </span>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
         {[
@@ -254,7 +345,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
           }
           {shareState === 'copied' ? 'Copied!' : shareState === 'error' ? 'Failed' : 'Share'}
         </button>
-        {allAnswered && !reviews && (
+        {isLocked && !reviews && (
           <button
             onClick={handleReview}
             disabled={reviewState === 'loading'}

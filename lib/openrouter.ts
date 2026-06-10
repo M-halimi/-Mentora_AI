@@ -1,17 +1,31 @@
-import { QuizQuestion } from '@/types'
+import { QuizQuestion, QuizConfig } from '@/types'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
-const PROMPT = `
+function buildPrompt(config: QuizConfig): string {
+  const difficultyInstruction = {
+    easy: 'Questions should be straightforward, testing basic understanding.',
+    medium: 'Questions should require moderate comprehension and application.',
+    hard: 'Questions should be challenging, requiring deep analysis and synthesis.',
+    mixed: 'Mix of easy, medium, and hard questions for balanced difficulty.',
+  }[config.difficulty]
+
+  const modeInstruction = config.mode === 'exam'
+    ? 'Do NOT include any hints or explanations in the output. Return only the JSON array of questions.'
+    : ''
+
+  return `
 You are an expert language teacher and quiz generator.
 
 STRICT RULES:
 - Return ONLY valid JSON
-- Exactly 10 MCQ questions
+- Exactly ${config.numQuestions} MCQ questions
 - Each question has exactly 4 options
 - Only one correct answer per question
 - The "answer" field must be the FULL TEXT of the correct option
 - No explanations, no markdown
+- ${difficultyInstruction}
+- ${modeInstruction}
 
 FORMAT:
 [
@@ -24,6 +38,7 @@ FORMAT:
 
 LESSON:
 `
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
@@ -101,7 +116,8 @@ export async function callOpenRouter(
 }
 
 export async function generateQuizViaOpenRouter(
-  text: string
+  text: string,
+  config: QuizConfig
 ): Promise<QuizQuestion[]> {
   try {
     const truncated = text.slice(0, 12000)
@@ -114,7 +130,7 @@ export async function generateQuizViaOpenRouter(
         },
         {
           role: 'user',
-          content: PROMPT + truncated,
+          content: buildPrompt(config) + truncated,
         },
       ],
       { model: 'meta-llama/llama-3.1-8b-instruct', temperature: 0.2, max_tokens: 6000 }

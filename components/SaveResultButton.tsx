@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { QuestionReview } from '@/types'
 import { saveResult } from '@/lib/quiz-results-store'
+import { getNameFromSession } from '@/components/NamePromptModal'
 
 interface SaveResultButtonProps {
   reviews: QuestionReview[]
@@ -10,12 +11,11 @@ interface SaveResultButtonProps {
 }
 
 export function SaveResultButton({ reviews, score }: SaveResultButtonProps) {
-  const [name, setName] = useState('')
   const [saved, setSaved] = useState(false)
 
   function handleSave() {
-    const trimmed = name.trim()
-    if (!trimmed) return
+    const name = getNameFromSession()
+    if (!name) return
 
     const weakTopics = new Map<string, number>()
     reviews.forEach(r => {
@@ -26,7 +26,7 @@ export function SaveResultButton({ reviews, score }: SaveResultButtonProps) {
 
     saveResult({
       id: crypto.randomUUID(),
-      studentName: trimmed,
+      studentName: name,
       date: new Date().toISOString().slice(0, 10),
       score,
       weakTopics: Array.from(weakTopics.entries()).map(([topic, count]) => ({ topic, count })),
@@ -47,20 +47,15 @@ export function SaveResultButton({ reviews, score }: SaveResultButtonProps) {
 
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
-      <input
-        type="text"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        placeholder="Student name"
-        onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-        className="rounded-lg border px-3 py-1.5 text-xs outline-none transition-colors"
-        style={{ borderColor: 'var(--border)', color: 'var(--text)', backgroundColor: 'var(--surface)', width: 140 }}
-      />
+      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+        Saving as <strong style={{ color: 'var(--text)' }}>{getNameFromSession() || '...'}</strong>
+      </span>
       <button
         onClick={handleSave}
-        disabled={!name.trim()}
-        className="rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-all active:scale-[0.97] disabled:opacity-40"
+        className="rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-all active:scale-[0.97]"
         style={{ backgroundColor: '#6366F1' }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
       >
         Save to Dashboard
       </button>
