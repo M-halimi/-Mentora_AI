@@ -28,7 +28,23 @@ const STATUS_MESSAGES = [
   'Finalizing results...',
 ]
 
-const PARTICLES_COUNT = 12
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  )
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
+
+const PARTICLES_COUNT = isMobileDevice() ? 4 : 12
 
 function random(min: number, max: number) {
   return Math.random() * (max - min) + min
@@ -468,8 +484,8 @@ export function QuizProcessing({ isComplete, onTransitionToResults }: QuizProces
             className="fixed inset-0 z-50 flex items-center justify-center p-5"
             style={{
               backgroundColor: 'rgba(0,0,0,0.25)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
+              backdropFilter: prefersReducedMotion() ? 'none' : 'blur(10px)',
+              WebkitBackdropFilter: prefersReducedMotion() ? 'none' : 'blur(10px)',
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -1,26 +1,34 @@
 import { QuizQuestion } from '@/types'
 import { jsPDF } from 'jspdf'
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1)
+  )
+}
+
+function triggerDownload(href: string, filename: string) {
+  const a = document.createElement('a')
+  a.href = href
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 export function downloadJSON(questions: QuizQuestion[], filename = 'quiz.json') {
   const content = JSON.stringify(questions, null, 2)
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
-  if (isIOS) {
-    const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(content)}`
-    const a = document.createElement('a')
-    a.href = dataUrl
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+  if (isIOSDevice()) {
+    triggerDownload(`data:application/json;charset=utf-8,${encodeURIComponent(content)}`, filename)
   } else {
     const blob = new Blob([content], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    triggerDownload(url, filename)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
   }
 }
 
@@ -58,6 +66,8 @@ export function downloadPDF(questions: QuizQuestion[], title = 'Quiz') {
   y += 8
 
   questions.forEach((q, i) => {
+    if (!q || typeof q.question !== 'string') return
+
     const lines = doc.splitTextToSize(q.question, contentWidth)
     const questionHeight = lines.length * 6 + 4 * 8 + 10
 
@@ -74,8 +84,10 @@ export function downloadPDF(questions: QuizQuestion[], title = 'Quiz') {
     y += lines.length * 5 + 4
 
     const labels = ['A', 'B', 'C', 'D']
-    q.options.forEach((opt, oi) => {
-      const optLines = doc.splitTextToSize(`${labels[oi]}. ${opt}`, contentWidth - 6)
+    const options = Array.isArray(q.options) ? q.options : []
+    options.forEach((opt, oi) => {
+      const label = oi < labels.length ? labels[oi] : '?'
+      const optLines = doc.splitTextToSize(`${label}. ${opt}`, contentWidth - 6)
       const optHeight = optLines.length * 5
 
       checkSpace(optHeight + 6)
@@ -88,7 +100,7 @@ export function downloadPDF(questions: QuizQuestion[], title = 'Quiz') {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(100)
-    const answerText = `Answer: ${q.answer}`
+    const answerText = `Answer: ${q.answer ?? ''}`
     checkSpace(8)
     doc.text(answerText, margin, y)
     doc.setTextColor(0)

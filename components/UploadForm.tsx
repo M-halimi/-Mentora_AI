@@ -10,6 +10,18 @@ interface UploadFormProps {
   onGenerate: () => void
 }
 
+function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
+  if (file.arrayBuffer) {
+    return file.arrayBuffer()
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 export function UploadForm({ onTextExtracted, onGenerate }: UploadFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,14 +40,17 @@ export function UploadForm({ onTextExtracted, onGenerate }: UploadFormProps) {
       setLoading(true)
       setError(null)
 
-      const pdfjsLib = await import('pdfjs-dist')
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        typeof window !== 'undefined' && window.location.origin
-          ? `${window.location.origin}/pdf.worker.min.mjs`
-          : `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
+      const origin = typeof window !== 'undefined' && window.location.origin
+        ? window.location.origin
+        : ''
 
-      const arrayBuffer = await file.arrayBuffer()
+      pdfjsLib.GlobalWorkerOptions.workerSrc = origin
+        ? `${origin}/pdf.worker.min.mjs`
+        : `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
+
+      const arrayBuffer = await readFileAsArrayBuffer(file)
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 

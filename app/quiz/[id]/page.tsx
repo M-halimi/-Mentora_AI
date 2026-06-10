@@ -88,7 +88,7 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
                 {q.question}
               </p>
               <div className="space-y-2">
-                {q.options.map((opt, oi) => (
+                {Array.isArray(q.options) ? q.options.map((opt, oi) => (
                   <div
                     key={opt}
                     className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
@@ -113,7 +113,7 @@ export default function SharedQuizPage({ params }: { params: Promise<{ id: strin
                       </svg>
                     )}
                   </div>
-                ))}
+                )) : null}
               </div>
             </div>
           ))}

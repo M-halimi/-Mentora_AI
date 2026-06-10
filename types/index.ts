@@ -61,4 +61,16 @@ export interface QuestionReview {
   grammarRule: string
   example: string
   tip: string
+  whyWrong: string
+  insight: string
+  commonMistake: string
+  topic: string
+}
+
+export interface StudentResult {
+  id: string
+  studentName: string
+  date: string
+  score: { correct: number; total: number; percentage: number }
+  weakTopics: { topic: string; count: number }[]
 }

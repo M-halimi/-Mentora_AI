@@ -4,7 +4,7 @@ import { Redis } from '@upstash/redis'
 /* ─── Configuration ─────────────────────────────────────────── */
 
 const LIMIT = 3
-const DEV_ME_IP = '105.69.252.5'
+const DEV_ME_IP = '105.69.252.144' // my home IP, for easy testing
 
 function getDevInternalKey(): string {
   return process.env.DEV_INTERNAL_KEY || 'teacher-copilot-dev'

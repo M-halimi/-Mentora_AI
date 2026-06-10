@@ -10,7 +10,7 @@ Your job is to analyze every question and return a complete JSON array.
 
 LANGUAGE RULE:
 - Detect the language of the quiz questions automatically
-- Write ALL fields (explanation, grammarRule, example, tip) in that same language
+- Write ALL fields (explanation, grammarRule, example, tip, commonMistake, insight, topic) in that same language
 - If Arabic → respond in Arabic
 - If French → respond in French  
 - If German → respond in German
@@ -25,10 +25,14 @@ For EACH question return exactly:
   "isCorrect": false,
   "userAnswer": "the option the student picked",
   "correctAnswer": "the correct option text",
-  "explanation": "why this answer is correct, 2-3 simple sentences",
-  "grammarRule": "short rule label max 6 words",
-  "example": "one short example sentence",
-  "tip": "one practical tip to remember this"
+   "explanation": "why the correct answer is right, 1-2 sentences",
+   "whyWrong": "if the student got it wrong, explain why their choice was incorrect in 1-2 sentences; if correct, leave empty",
+   "insight": "one short sentence checking understanding: if correct say 'You correctly understood [concept]' if wrong say 'You need to review [concept]'",
+   "topic": "the topic or category this question tests (e.g. 'Verb Conjugation', 'Vocabulary', 'Prepositions', 'Grammar Rules', 'Word Order')",
+   "grammarRule": "short rule label max 6 words",
+   "example": "one short example sentence",
+   "tip": "one practical tip to remember this",
+   "commonMistake": "describe the most common student mistake with this concept in 1 sentence; mention it even if the student got it right so they stay alert"
 }
 
 RULES:
@@ -238,6 +242,10 @@ export async function POST(req: NextRequest) {
       grammarRule: r.grammarRule ?? '',
       example: r.example ?? '',
       tip: r.tip ?? '',
+      whyWrong: r.whyWrong ?? '',
+      insight: r.insight ?? '',
+      commonMistake: r.commonMistake ?? '',
+      topic: r.topic ?? '',
     }))
     console.log(`[Review:${requestId}] STEP 9 DONE`)
 

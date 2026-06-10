@@ -7,12 +7,20 @@ interface QuizReviewProps {
   reviews: QuestionReview[]
   score: { correct: number; total: number; percentage: number }
   onReset: () => void
+  onBack?: () => void
+}
+
+function isMobileSafari(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1)
 }
 
 function Celebration({ percentage }: { percentage: number }) {
   const particles = useMemo(() => {
     const p = Math.min(percentage, 100)
-    const count = p >= 100 ? 60 : p >= 80 ? 40 : p >= 60 ? 25 : 12
+    const maxCount = isMobileSafari() ? 10 : 25
+    const count = p >= 100 ? maxCount : p >= 80 ? Math.min(20, maxCount) : Math.min(12, maxCount)
     const colors = ['#6366F1', '#818CF8', '#A78BFA', '#C084FC', '#E879F9', '#F472B6']
     return Array.from({ length: count }, (_, i) => ({
       id: i,
@@ -20,8 +28,8 @@ function Celebration({ percentage }: { percentage: number }) {
       left: `${(i / count) * 100}%`,
       delay: `${Math.random() * 0.8}s`,
       duration: `${1.5 + Math.random() * 2}s`,
-      size: 4 + Math.random() * 8,
-      drift: Math.random() * 120 - 60,
+      size: 3 + Math.random() * 5,
+      drift: Math.random() * 80 - 40,
     }))
   }, [percentage])
 
@@ -47,7 +55,7 @@ function Celebration({ percentage }: { percentage: number }) {
   )
 }
 
-export function QuizReview({ reviews, score, onReset }: QuizReviewProps) {
+export function QuizReview({ reviews, score, onReset, onBack }: QuizReviewProps) {
   const [showCelebration, setShowCelebration] = useState(true)
 
   useEffect(() => {
@@ -63,11 +71,47 @@ export function QuizReview({ reviews, score, onReset }: QuizReviewProps) {
     return { line1: 'Keep Practicing!', line2: 'Review the material and try again.' }
   }, [score.percentage])
 
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
+
+  const correctCount = useMemo(() => reviews.filter(r => r.isCorrect).length, [reviews])
+  const incorrectCount = useMemo(() => reviews.length - correctCount, [reviews, correctCount])
+
+  const allExpanded = reviews.length > 0 && expandedQuestions.size === reviews.length
+
+  function toggleQuestion(index: number) {
+    setExpandedQuestions(prev => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  function expandAll() {
+    setExpandedQuestions(new Set(reviews.map((_, i) => i)))
+  }
+
+  function collapseAll() {
+    setExpandedQuestions(new Set())
+  }
+
   return (
     <>
       {showCelebration && score.percentage >= 60 && <Celebration percentage={score.percentage} />}
 
       <div className="w-full mx-auto space-y-5 animate-fade-in">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1 text-xs font-medium transition-colors"
+            style={{ color: 'var(--muted)' }}
+          >
+            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            Back to Summary
+          </button>
+        )}
         {/* Celebration Banner */}
         <div
           className="relative overflow-hidden rounded-[18px] border p-6 text-center"
@@ -126,109 +170,197 @@ export function QuizReview({ reviews, score, onReset }: QuizReviewProps) {
           </div>
         </div>
 
+        {/* Summary */}
+        <div className="rounded-[18px] border p-5" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Performance Summary</p>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1" style={{ color: '#10B981' }}>
+                <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                {correctCount} correct
+              </span>
+              <span className="flex items-center gap-1" style={{ color: '#EF4444' }}>
+                <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                {incorrectCount} incorrect
+              </span>
+            </div>
+          </div>
+          <p className="text-sm font-bold" style={{ color: 'var(--text)', fontFamily: 'var(--font-sora)' }}>
+            {score.correct}/{score.total} ({score.percentage}%)
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+            {message.line2}
+          </p>
+        </div>
+
+        {/* Expand / Collapse */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+            Questions ({reviews.length})
+          </p>
+          <button
+            onClick={allExpanded ? collapseAll : expandAll}
+            className="inline-flex items-center gap-1 text-xs font-medium transition-colors"
+            style={{ color: '#6366F1' }}
+          >
+            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              {allExpanded ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              )}
+            </svg>
+            {allExpanded ? 'Collapse all' : 'Expand all'}
+          </button>
+        </div>
+
         {/* Per-question Review Cards */}
-        <div className="space-y-3">
-          {reviews.map((r, i) => (
+        <div className="space-y-2">
+          {Array.isArray(reviews) ? reviews.map((r, i) => {
+            const isExpanded = expandedQuestions.has(i)
+            return (
             <div
               key={i}
-              className="rounded-[18px] border p-5 transition-all duration-200"
+              className="rounded-[18px] border transition-all duration-200"
               style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between mb-3">
+              <div
+                className="flex items-center gap-2 p-4 cursor-pointer select-none"
+                onClick={() => toggleQuestion(i)}
+              >
                 <span
-                  className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold"
+                  className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold shrink-0"
                   style={{ backgroundColor: 'var(--accent-soft)', color: '#6366F1' }}
                 >
-                  Question {i + 1}
+                  Q{i + 1}
                 </span>
                 <span
-                  className="inline-flex items-center gap-1 text-[11px] font-medium"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium shrink-0"
                   style={{ color: r.isCorrect ? '#10B981' : '#EF4444' }}
                 >
-                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     {r.isCorrect ? (
                       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     ) : (
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     )}
                   </svg>
-                  {r.isCorrect ? 'Correct' : 'Incorrect'}
+                  {r.isCorrect ? 'Correct (+1 pt)' : 'Incorrect (+0 pts)'}
                 </span>
+                <p className="text-xs truncate flex-1 min-w-0" style={{ color: 'var(--muted)' }}>
+                  {r.question}
+                </p>
+                <svg
+                  className="size-4 shrink-0 transition-transform duration-200"
+                  style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
               </div>
 
-              {/* Question */}
-              <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text)' }}>
-                {r.question}
-              </p>
+              {isExpanded && (
+                <div className="px-4 pb-4 space-y-3 border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+                  <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text)' }}>
+                    {r.question}
+                  </p>
 
-              {/* Answers */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-                <span style={{ color: 'var(--muted)' }}>
-                  Your answer:{' '}
-                  <span className="font-medium" style={{ color: r.isCorrect ? '#10B981' : '#EF4444' }}>
-                    {r.userAnswer}
-                  </span>
-                </span>
-                {!r.isCorrect && (
-                  <span style={{ color: 'var(--muted)' }}>
-                    Correct answer:{' '}
-                    <span className="font-medium" style={{ color: '#10B981' }}>
-                      {r.correctAnswer}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-medium" style={{ color: r.isCorrect ? '#10B981' : '#EF4444' }}>
+                      Status: {r.isCorrect ? 'Correct (+1 pt)' : 'Incorrect (+0 pts)'}
                     </span>
-                  </span>
-                )}
-              </div>
-
-              {/* Explanation */}
-              <div className="mt-3 rounded-xl border p-4" style={{ borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'var(--accent-soft)' }}>
-                <div className="mb-2">
-                  <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
-                    Explanation
-                  </p>
-                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
-                    {r.explanation}
-                  </p>
-                </div>
-
-                {/* Grammar Rule */}
-                {r.grammarRule && (
-                  <div className="mb-2">
-                    <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
-                      Grammar Rule
-                    </p>
-                    <p className="text-xs font-medium" style={{ color: '#6366F1' }}>
-                      {r.grammarRule}
-                    </p>
                   </div>
-                )}
 
-                {/* Example */}
-                {r.example && (
-                  <div className="mb-2">
-                    <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
-                      Example
-                    </p>
-                    <p className="text-xs italic" style={{ color: 'var(--text)' }}>
-                      &ldquo;{r.example}&rdquo;
-                    </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+                    <span style={{ color: 'var(--muted)' }}>
+                      Your answer:{' '}
+                      <span className="font-medium" style={{ color: r.isCorrect ? '#10B981' : '#EF4444' }}>
+                        {r.userAnswer}
+                      </span>
+                    </span>
+                    {!r.isCorrect && (
+                      <span style={{ color: 'var(--muted)' }}>
+                        Correct answer:{' '}
+                        <span className="font-medium" style={{ color: '#10B981' }}>
+                          {r.correctAnswer}
+                        </span>
+                      </span>
+                    )}
                   </div>
-                )}
 
-                {/* Tip */}
-                {r.tip && (
+                  {r.insight && (
+                    <div>
+                      <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
+                        Insight
+                      </p>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
+                        {r.insight}
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
-                      Tip
+                      Explanation
                     </p>
-                    <p className="text-xs" style={{ color: '#D97706' }}>
-                      {r.tip}
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
+                      {r.explanation}
                     </p>
                   </div>
-                )}
-              </div>
+
+                  {r.grammarRule && (
+                    <div>
+                      <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
+                        Rule
+                      </p>
+                      <p className="text-xs font-medium" style={{ color: '#6366F1' }}>
+                        {r.grammarRule}
+                      </p>
+                    </div>
+                  )}
+
+                  {r.example && (
+                    <div>
+                      <p className="text-[10px] font-medium mb-0.5" style={{ color: 'var(--muted)' }}>
+                        Example
+                      </p>
+                      <p className="text-xs italic" style={{ color: 'var(--text)' }}>
+                        &ldquo;{r.example}&rdquo;
+                      </p>
+                    </div>
+                  )}
+
+                  {r.tip && (
+                    <div>
+                      <p className="text-[10px] font-medium mb-0.5 flex items-center gap-1" style={{ color: '#D97706' }}>
+                        <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+                        </svg>
+                        Learning Tip
+                      </p>
+                      <p className="text-xs" style={{ color: '#D97706' }}>
+                        {r.tip}
+                      </p>
+                    </div>
+                  )}
+
+                  {r.commonMistake && (
+                    <div className="rounded-lg border p-3" style={{ borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.06)' }}>
+                      <p className="text-[10px] font-medium mb-0.5" style={{ color: '#D97706' }}>
+                        Watch out
+                      </p>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text)' }}>
+                        {r.commonMistake}
+                      </p>
+                    </div>
+                  )}
+
+
+                </div>
+              )}
             </div>
-          ))}
+            )
+          }) : null}
         </div>
 
         {/* Bottom CTA */}

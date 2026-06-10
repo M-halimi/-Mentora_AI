@@ -1,9 +1,59 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Component, useState, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { QuizQuestion, Explanation, QuestionReview } from '@/types'
 import { downloadJSON, downloadPDF } from '@/lib/download'
 import { QuizReview } from './QuizReview'
+import { QuizResultScreen } from './QuizResultScreen'
+import { SaveResultButton } from './SaveResultButton'
+
+class ReviewErrorBoundary extends Component<
+  { children: ReactNode; onReset: () => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; onReset: () => void }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[ReviewErrorBoundary] Caught:', error.message)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full text-center py-16 animate-fade-in">
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border" style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}>
+            <svg className="size-6" style={{ color: 'var(--muted)' }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Review temporarily unavailable</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+            Something went wrong while loading the review.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false })
+              this.props.onReset()
+            }}
+            className="mt-6 inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.97]"
+            style={{ backgroundColor: '#6366F1' }}
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 interface QuizResultsProps {
   questions: QuizQuestion[]
@@ -19,6 +69,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
   const [explainLang, setExplainLang] = useState<Record<number, 'base' | 'fr' | 'en' | 'de' | 'ar'>>({})
   const [reviews, setReviews] = useState<QuestionReview[] | null>(null)
   const [reviewState, setReviewState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [reviewStep, setReviewStep] = useState<'result' | 'review'>('result')
 
   const score = useMemo(() => {
     const correct = Object.entries(revealed).filter(
@@ -72,9 +123,12 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
       try {
         if (navigator.share) {
           await navigator.share({ title: 'Teacher Copilot Quiz', url })
-        } else {
-          await navigator.clipboard.writeText(url)
+          return
         }
+      } catch {
+      }
+      try {
+        await navigator.clipboard.writeText(url)
       } catch {
         const textarea = document.createElement('textarea')
         textarea.value = url
@@ -82,7 +136,9 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
         textarea.style.opacity = '0'
         document.body.appendChild(textarea)
         textarea.select()
-        document.execCommand('copy')
+        try {
+          document.execCommand('copy')
+        } catch {}
         document.body.removeChild(textarea)
       }
       setShareState('copied')
@@ -101,8 +157,14 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questions, userAnswers: revealed }),
       })
+      if (!res.ok) {
+        throw new Error(`Server error (${res.status})`)
+      }
       const json = await res.json()
       if (!json.success) throw new Error(json.error || 'Review failed')
+      if (!Array.isArray(json.data)) {
+        throw new Error('Invalid review data received')
+      }
       setReviews(json.data)
       setReviewState('idle')
     } catch (err) {
@@ -216,7 +278,21 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
       </div>
 
       {reviews ? (
-        <QuizReview reviews={reviews} score={score} onReset={onReset} />
+        <>
+          {reviewStep === 'result' ? (
+            <QuizResultScreen
+              score={score}
+              reviews={reviews}
+              onViewFullReview={() => setReviewStep('review')}
+              onReset={onReset}
+            />
+          ) : (
+            <ReviewErrorBoundary onReset={onReset}>
+              <QuizReview reviews={reviews} score={score} onReset={onReset} onBack={() => setReviewStep('result')} />
+            </ReviewErrorBoundary>
+          )}
+          <SaveResultButton reviews={reviews} score={score} />
+        </>
       ) : (
         <>
           {/* Questions */}
@@ -249,7 +325,7 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
                   <p className="text-sm font-medium leading-relaxed" style={{ color: 'var(--text)' }}>{q.question}</p>
 
                   <div className="mt-3 space-y-1.5">
-                    {q.options?.map((opt) => {
+                    {Array.isArray(q.options) ? q.options.map((opt) => {
                       const isSelected = selected === opt
                       const isAnswer = q.answer === opt
                       let optStyle: React.CSSProperties = { borderColor: 'var(--border)', color: 'var(--text)' }
@@ -258,6 +334,9 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
                         else if (isSelected && !isCorrect) optStyle = { borderColor: 'rgba(239,68,68,0.4)', backgroundColor: 'var(--error-soft)', color: '#EF4444' }
                         else optStyle = { borderColor: 'var(--border)', color: 'var(--muted)', opacity: 0.5 }
                       }
+
+                      const optIndex = q.options.indexOf(opt)
+                      const letter = optIndex >= 0 ? String.fromCharCode(65 + optIndex) : '?'
 
                       return (
                         <button key={opt} onClick={() => handleSelect(i, opt)} disabled={isAnswered}
@@ -269,12 +348,12 @@ export function QuizResults({ questions = [], onReset }: QuizResultsProps) {
                             backgroundColor: isAnswered && isAnswer ? '#10B981' : isAnswered && isSelected && !isCorrect ? '#EF4444' : 'transparent',
                             color: isAnswered && (isAnswer || (isSelected && !isCorrect)) ? 'white' : 'var(--muted)',
                           }}>
-                            {String.fromCharCode(65 + q.options.indexOf(opt))}
+                            {letter}
                           </span>
                           <span className="pt-0.5 leading-snug">{opt}</span>
                         </button>
                       )
-                    })}
+                    }) : null}
                   </div>
 
                   {isAnswered && !isCorrect && (

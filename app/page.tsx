@@ -64,6 +64,11 @@ export default function Home() {
         return
       }
 
+      if (!Array.isArray(json.data?.questions)) {
+        setError('Invalid quiz data received')
+        setStep('error')
+        return
+      }
       setQuestions(json.data.questions)
       setGenerationComplete(true)
     } catch (err: unknown) {
@@ -126,7 +131,16 @@ export default function Home() {
               Teacher Copilot
             </span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <a
+              href="/dashboard"
+              className="text-[11px] font-medium transition-colors"
+              style={{ color: 'var(--muted)' }}
+            >
+              Dashboard
+            </a>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
